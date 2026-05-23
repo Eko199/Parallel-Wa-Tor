@@ -1,6 +1,10 @@
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class World {
     private static final double FISH_DENSITY = 0.30;
@@ -14,6 +18,9 @@ public class World {
     private final Entity[][] grid;
     private final Random random;
     private int currentChronon = 0;
+
+    private final List<Lock> locks = new ArrayList<>();
+    private CyclicBarrier barrier;
 
     public World(int width, int height) {
         this.width = width;
@@ -145,6 +152,95 @@ public class World {
                 }
             }
         }
+    }
+
+    public void runBatch(int startRow, int endRow, int batchNum, int chronons) throws BrokenBarrierException, InterruptedException {
+        for (int c = 0; c < chronons; ++c) {
+            for (int y = startRow; y <= endRow; ++y) {
+                if (y == startRow || y == startRow + 1) {
+                    locks.get(batchNum).lock();
+                }
+
+                if (y == endRow || y == endRow - 1) {
+                    locks.get((endRow == height - 1) ? 0 : (batchNum + 1)).lock();
+                }
+
+                try {
+                    for (int x = 0; x < width; ++x) {
+                        Entity current = grid[y][x];
+
+                        if (current.getType() == Entity.EntityType.EMPTY || current.getLastChronon() == currentChronon) {
+                            continue;
+                        }
+
+                        current.setLastChronon(currentChronon);
+                        current.setAge(current.getAge() + 1);
+
+                        if (current.getType() == Entity.EntityType.FISH) {
+                            processFish(x, y, current);
+                        } else if (current.getType() == Entity.EntityType.SHARK) {
+                            processShark(x, y, current);
+                        }
+                    }
+                } finally {
+                    if (y == startRow || y == startRow + 1) {
+                        locks.get(batchNum).unlock();
+                    }
+
+                    if (y == endRow || y == endRow - 1) {
+                        locks.get((endRow == height - 1) ? 0 : (batchNum + 1)).unlock();
+                    }
+                }
+            }
+
+            barrier.await();
+        }
+    }
+
+    public void runSimulation(int chronons) {
+        for (int i = 0; i < chronons; ++i) {
+            nextChronon();
+        }
+    }
+
+    public void runSimulation(int chronons, int threadsCount) {
+        currentChronon = 1;
+        int batchSize = height / threadsCount;
+
+        barrier = new CyclicBarrier(threadsCount, () -> {
+            ++currentChronon;
+        });
+
+        Thread[] threads = new Thread[threadsCount];
+
+        for (int i = 0; i < threadsCount; i++) {
+            locks.add(new ReentrantLock());
+        }
+
+        for (int i = 0; i < threadsCount; i++) {
+            threads[i] = new Thread(
+                new WaTorWorker(
+                        this,
+                        i * batchSize,
+                        (i == threadsCount - 1) ? height - 1 : (i + 1) * batchSize - 1,
+                        i,
+                        chronons
+                )
+            );
+
+            threads[i].start();
+        }
+
+        for (int i = 0; i < threadsCount; i++) {
+            try {
+                threads[i].join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.out.println(e.getMessage());
+            }
+        }
+
+        locks.clear();
     }
 
     @Override

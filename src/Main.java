@@ -1,9 +1,10 @@
 void main() {
-    World world = new World(100, 50);
+    World world = new World(1500, 1500);
 
-    for (int i = 0; i < 10000; ++i) {
-        world.nextChronon();
-    }
+    long startTime = System.nanoTime();
+    world.runSimulation(150, 2);
+    long endTime = System.nanoTime();
 
-    System.out.println(world);
+    //System.out.println(world);
+    System.out.printf("Parallel Execution: %.2f ms\n", (endTime - startTime) / 1000000.0);
 }
