@@ -3,6 +3,7 @@ import java.util.Random;
 import java.util.List;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -12,6 +13,9 @@ public class World {
     private static final int FISH_BREED_TIME = 3;
     private static final int SHARK_BREED_TIME = 10;
     private static final int SHARK_ENERGY_GAIN = 3;
+
+    private static final int[] DX = { 0, 0, -1, 1 };
+    private static final int[] DY = { -1, 1, 0, 0 };
 
     private final int width;
     private final int height;
@@ -55,74 +59,82 @@ public class World {
         return (y + height) % height;
     }
 
-    private List<Point> getNeighbors(int x, int y, Entity.EntityType targetType) {
-        List<Point> neighbors = new ArrayList<>(4);
-
-        int[] dx = {0, 0, -1, 1};
-        int[] dy = {-1, 1, 0, 0};
+    private int getNeighbors(int x, int y, int[] arrX, int[] arrY, Entity.EntityType targetType) {
+        int count = 0;
 
         for (int i = 0; i < 4; i++) {
-            int nx = getWrapX(x + dx[i]);
-            int ny = getWrapY(y + dy[i]);
+            int nx = getWrapX(x + DX[i]);
+            int ny = getWrapY(y + DY[i]);
 
             if (grid[ny][nx].getType() == targetType) {
-                neighbors.add(new Point(nx, ny));
+                arrX[count] = nx;
+                arrY[count] = ny;
+                ++count;
             }
         }
 
-        return neighbors;
+        return count;
     }
 
-    private void processFish(int x, int y, Entity fish) {
-        List<Point> emptySpaces = getNeighbors(x, y, Entity.EntityType.EMPTY);
+    private void processFish(int x, int y, Entity fish, Random localRandom, int[] tempX, int[] tempY) {
+        int emptyCount = getNeighbors(x, y, tempX, tempY, Entity.EntityType.EMPTY);
 
-        if (!emptySpaces.isEmpty()) {
-            Point newPos = emptySpaces.get(random.nextInt(emptySpaces.size()));
-            grid[newPos.y][newPos.x] = fish;
+        if (emptyCount > 0) {
+            int emptyId = localRandom.nextInt(emptyCount);
+            Entity oldSpace = grid[tempY[emptyId]][tempX[emptyId]];
+
+            grid[tempY[emptyId]][tempX[emptyId]] = fish;
+            grid[y][x] = oldSpace;
 
             if (fish.getAge() >= FISH_BREED_TIME) {
-                Entity newborn = new Entity(Entity.EntityType.FISH);
-                newborn.setLastChronon(currentChronon);
-                grid[y][x] = newborn;
+                oldSpace.becomeFish();
+                oldSpace.setLastChronon(currentChronon);
                 fish.setAge(0);
-            } else {
-                grid[y][x] = new Entity(Entity.EntityType.EMPTY);
             }
         }
     }
 
-    private void processShark(int x, int y, Entity shark) {
+    private void processShark(int x, int y, Entity shark, Random localRandom, int[] tempX, int[] tempY) {
         shark.setEnergy(shark.getEnergy() - 1);
 
         if (shark.getEnergy() <= 0) {
-            grid[y][x] = new Entity(Entity.EntityType.EMPTY);
+            shark.becomeEmpty();
             return;
         }
 
-        List<Point> food = getNeighbors(x, y, Entity.EntityType.FISH);
-        Point newPos = null;
+        int foodCount = getNeighbors(x, y, tempX, tempY, Entity.EntityType.FISH);
+        int newX = -1, newY = -1;
 
-        if (!food.isEmpty()) {
-            newPos = food.get(random.nextInt(food.size()));
+        if (foodCount > 0) {
+            int foodId = localRandom.nextInt(foodCount);
+            newX = tempX[foodId];
+            newY = tempY[foodId];
+
             shark.setEnergy(shark.getEnergy() + SHARK_ENERGY_GAIN);
         } else {
-            List<Point> emptySpaces = getNeighbors(x, y, Entity.EntityType.EMPTY);
+            int emptyCount = getNeighbors(x, y, tempX, tempY,  Entity.EntityType.EMPTY);
 
-            if (!emptySpaces.isEmpty()) {
-                newPos = emptySpaces.get(random.nextInt(emptySpaces.size()));
+            if (emptyCount > 0) {
+                int emptyId = localRandom.nextInt(emptyCount);
+
+                newX = tempX[emptyId];
+                newY = tempY[emptyId];
             }
         }
 
-        if (newPos != null) {
-            grid[newPos.y][newPos.x] = shark;
+        if (newX != -1 && newY != -1) {
+            Entity oldEntity = grid[newY][newX];
+
+            grid[newY][newX] = shark;
+            grid[y][x] = oldEntity;
 
             if (shark.getAge() >= SHARK_BREED_TIME) {
-                Entity newborn = new Entity(Entity.EntityType.SHARK);
-                newborn.setLastChronon(currentChronon);
-                grid[y][x] = newborn;
+                oldEntity.becomeShark();
+                oldEntity.setLastChronon(currentChronon);
+
                 shark.setAge(0);
             } else {
-                grid[y][x] = new Entity(Entity.EntityType.EMPTY);
+                oldEntity.becomeEmpty();
             }
         }
     }
@@ -133,6 +145,8 @@ public class World {
 
     public void nextChronon() {
         ++currentChronon;
+        int[] tempX = new int[4];
+        int[] tempY = new int[4];
 
         for (int y = 0; y < height; ++y) {
             for (int x = 0; x < width; ++x) {
@@ -146,15 +160,19 @@ public class World {
                 current.setAge(current.getAge() + 1);
 
                 if (current.getType() == Entity.EntityType.FISH) {
-                    processFish(x, y, current);
+                    processFish(x, y, current, random, tempX, tempY);
                 } else if (current.getType() == Entity.EntityType.SHARK) {
-                    processShark(x, y, current);
+                    processShark(x, y, current, random, tempX, tempY);
                 }
             }
         }
     }
 
     public void runBatch(int startRow, int endRow, int batchNum, int chronons) throws BrokenBarrierException, InterruptedException {
+        Random localRandom = ThreadLocalRandom.current();
+        int[] tempX = new int[4];
+        int[] tempY = new int[4];
+
         for (int c = 0; c < chronons; ++c) {
             for (int y = startRow; y <= endRow; ++y) {
                 if (y == startRow || y == startRow + 1) {
@@ -177,9 +195,9 @@ public class World {
                         current.setAge(current.getAge() + 1);
 
                         if (current.getType() == Entity.EntityType.FISH) {
-                            processFish(x, y, current);
+                            processFish(x, y, current, localRandom, tempX, tempY);
                         } else if (current.getType() == Entity.EntityType.SHARK) {
-                            processShark(x, y, current);
+                            processShark(x, y, current, localRandom,  tempX, tempY);
                         }
                     }
                 } finally {
@@ -207,9 +225,7 @@ public class World {
         currentChronon = 1;
         int batchSize = height / threadsCount;
 
-        barrier = new CyclicBarrier(threadsCount, () -> {
-            ++currentChronon;
-        });
+        barrier = new CyclicBarrier(threadsCount, () -> ++currentChronon);
 
         Thread[] threads = new Thread[threadsCount];
 
@@ -258,7 +274,8 @@ public class World {
                     case SHARK -> sb.append("S ");
                 }
             }
-            sb.append("\n"); // Move to the next row
+
+            sb.append("\n");
         }
 
         return sb.toString();

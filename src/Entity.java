@@ -1,4 +1,6 @@
 public class Entity {
+    public static final int INITIAL_SHARK_ENERGY = 5;
+
     private EntityType type;
     private int age = 0;
     private int energy = 0;
@@ -8,7 +10,7 @@ public class Entity {
         this.type = type;
 
         if (type == EntityType.SHARK) {
-            this.energy = 5; // Give sharks some starting energy
+            this.energy = INITIAL_SHARK_ENERGY; // Give sharks some starting energy
         }
     }
 
@@ -42,6 +44,24 @@ public class Entity {
 
     public void setLastChronon(int lastChronon) {
         this.lastChronon = lastChronon;
+    }
+
+    public void becomeEmpty() {
+        this.setEnergy(0);
+        this.setAge(0);
+        this.setType(EntityType.EMPTY);
+    }
+
+    public void becomeFish() {
+        this.setEnergy(0);
+        this.setAge(0);
+        this.setType(EntityType.FISH);
+    }
+
+    public void becomeShark() {
+        this.setEnergy(INITIAL_SHARK_ENERGY);
+        this.setAge(0);
+        this.setType(EntityType.SHARK);
     }
 
     public enum EntityType {
