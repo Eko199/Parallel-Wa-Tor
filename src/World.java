@@ -215,17 +215,27 @@ public class World {
         }
     }
 
-    public void runSimulation(int chronons) {
+    public void runSimulation(int chronons, boolean visualize) {
         for (int i = 0; i < chronons; ++i) {
             nextChronon();
+
+            if (visualize && currentChronon % 10 == 0) {
+                WaTorVisualizer.saveFrame(grid, currentChronon / 10, 4);
+            }
         }
     }
 
-    public void runSimulation(int chronons, int threadsCount) {
+    public void runSimulation(int chronons, boolean visualize, int threadsCount) {
         currentChronon = 1;
         int batchSize = height / threadsCount;
 
-        barrier = new CyclicBarrier(threadsCount, () -> ++currentChronon);
+        barrier = new CyclicBarrier(threadsCount, () -> {
+            ++currentChronon;
+
+            if (visualize && currentChronon % 10 == 0) {
+                WaTorVisualizer.saveFrame(grid, currentChronon / 10, 4);
+            }
+        });
 
         Thread[] threads = new Thread[threadsCount];
 
@@ -269,9 +279,15 @@ public class World {
                 Entity current = grid[y][x];
 
                 switch (current.getType()) {
-                    case EMPTY -> sb.append(". ");
-                    case FISH  -> sb.append("F ");
-                    case SHARK -> sb.append("S ");
+                    case EMPTY:
+                        sb.append(". ");
+                        break;
+                    case FISH:
+                        sb.append("F ");
+                        break;
+                    case SHARK:
+                        sb.append("S ");
+                        break;
                 }
             }
 

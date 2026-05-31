@@ -1,15 +1,19 @@
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
         int width, height, chronons, threads;
+        boolean visualize;
 
-        if (args.length == 4) {
+        if (args.length == 5) {
             try {
-                width = Integer.parseInt(args[1]);
-                height = Integer.parseInt(args[2]);
-                chronons = Integer.parseInt(args[3]);
-                threads = Integer.parseInt(args[0]);
+                width = Integer.parseInt(args[0]);
+                height = Integer.parseInt(args[1]);
+                chronons = Integer.parseInt(args[2]);
+                threads = Integer.parseInt(args[3]);
+                visualize = Boolean.parseBoolean(args[4]);
 
                 if (width <= 0 || height < 10 || chronons <= 0 || threads <= 0) {
                     throw new IllegalArgumentException("Invalid parameters!");
@@ -50,15 +54,27 @@ public class Main {
                 System.out.print("Threads count must be positive: ");
                 threads = input.nextInt();
             }
+
+            System.out.print("Visualize? (y/n) ");
+            char choice = Character.toLowerCase(input.next().charAt(0));
+
+            while (choice != 'y' && choice != 'n') {
+                choice = Character.toLowerCase(input.next().charAt(0));
+            }
+
+            visualize = choice == 'y';
+        }
+
+        if (visualize) {
+            WaTorVisualizer.clearFrames();
         }
 
         World world = new World(width, height);
 
         long startTime = System.nanoTime();
-        world.runSimulation(chronons, threads);
+        world.runSimulation(chronons, visualize, threads);
         long endTime = System.nanoTime();
 
-        //System.out.println(world);
         System.out.printf("Parallel Execution: %.0f ms\n", (endTime - startTime) / 1000000.0);
     }
 }
