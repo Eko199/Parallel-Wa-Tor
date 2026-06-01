@@ -1,1 +1,1 @@
-ffmpeg -framerate 10 -i "frames\frame_%04d.png" -c:v gif wator_200.gif
+ffmpeg -framerate 10 -i "frames\frame_%04d.png" -c:v gif wator.gif

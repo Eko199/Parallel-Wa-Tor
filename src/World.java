@@ -149,7 +149,8 @@ public class World {
         int[] tempY = new int[4];
 
         for (int y = 0; y < height; ++y) {
-            for (int x = 0; x < width; ++x) {
+            for (int step = 0; step < width; ++step) {
+                int x = currentChronon % 2 == 0 ? step : (width - 1 - step);
                 Entity current = grid[y][x];
 
                 if (current.getType() == Entity.EntityType.EMPTY || current.getLastChronon() == currentChronon) {
@@ -184,7 +185,8 @@ public class World {
                 }
 
                 try {
-                    for (int x = 0; x < width; ++x) {
+                    for (int step = 0; step < width; ++step) {
+                        int x = currentChronon % 2 == 0 ? step : (width - 1 - step);
                         Entity current = grid[y][x];
 
                         if (current.getType() == Entity.EntityType.EMPTY || current.getLastChronon() == currentChronon) {
